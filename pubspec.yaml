@@ -1,5 +1,5 @@
 name: screen_lock_plugin
-description: "A new Flutter plugin project."
+description: "A Flutter plugin that allows you to lock the Android device screen programmatically using Device Admin permissions."
 version: 0.0.1
 repository: https://github.com/luisoibarra/screen_lock_plugin
 
