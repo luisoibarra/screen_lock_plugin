@@ -24,6 +24,18 @@ class MockScreenLockPluginPlatform
     // TODO: implement requestDeviceAdmin
     throw UnimplementedError();
   }
+
+  @override
+  Future<bool?> isScreenOn() {
+    // TODO: implement isScreenOn
+    throw UnimplementedError();
+  }
+
+  @override
+  Stream<String> onScreenStateChanged() {
+    // TODO: implement onScreenStateChanged
+    throw UnimplementedError();
+  }
 }
 
 void main() {
