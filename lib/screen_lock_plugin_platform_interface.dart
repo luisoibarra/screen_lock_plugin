@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'screen_lock_plugin_method_channel.dart';
 
@@ -26,5 +28,13 @@ abstract class ScreenLockPluginPlatform extends PlatformInterface {
 
   Future<void> requestDeviceAdmin() {
     throw UnimplementedError('requestDeviceAdmin() has not been implemented.');
+  }
+
+  Future<bool?> isScreenOn() {
+    throw UnimplementedError('isScreenOn() has not been implemented.');
+  }
+
+  Stream<String> onScreenStateChanged() {
+    throw UnimplementedError('onScreenStateChanged() has not been implemented.');
   }
 }

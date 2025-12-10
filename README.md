@@ -7,6 +7,8 @@ A Flutter plugin that allows you to programmatically lock the Android device scr
 - Lock the device screen programmatically
 - Check device admin permission status
 - Request device admin permissions
+- Check current screen state (`isScreenOn`)
+- Stream screen on/off events (`onScreenStateChanged`)
 - Simple and easy-to-use API
 
 ## Platform Support

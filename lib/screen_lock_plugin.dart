@@ -12,4 +12,12 @@ class ScreenLockPlugin {
   Future<void> requestDeviceAdmin() {
     return ScreenLockPluginPlatform.instance.requestDeviceAdmin();
   }
+
+  Future<bool?> isScreenOn() {
+    return ScreenLockPluginPlatform.instance.isScreenOn();
+  }
+
+  Stream<String> onScreenStateChanged() {
+    return ScreenLockPluginPlatform.instance.onScreenStateChanged();
+  }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:screen_lock_plugin/screen_lock_plugin.dart';
 
@@ -15,17 +17,37 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   final _screenLockPlugin = ScreenLockPlugin();
   bool _isAdminEnabled = false;
+  bool? _isScreenOn;
+  String _lastScreenEvent = 'None';
+  StreamSubscription<String>? _screenEventSub;
 
   @override
   void initState() {
     super.initState();
     _checkAdminStatus();
+    _subscribeToScreenEvents();
+    _checkScreenState();
   }
 
   Future<void> _checkAdminStatus() async {
     final isEnabled = await _screenLockPlugin.isDeviceAdminEnabled();
     setState(() {
       _isAdminEnabled = isEnabled ?? false;
+    });
+  }
+
+  Future<void> _checkScreenState() async {
+    final isOn = await _screenLockPlugin.isScreenOn();
+    setState(() {
+      _isScreenOn = isOn;
+    });
+  }
+
+  void _subscribeToScreenEvents() {
+    _screenEventSub = _screenLockPlugin.onScreenStateChanged().listen((event) {
+      setState(() {
+        _lastScreenEvent = event;
+      });
     });
   }
 
@@ -48,6 +70,12 @@ class _MyAppState extends State<MyApp> {
   }
 
   @override
+  void dispose() {
+    _screenEventSub?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
@@ -61,6 +89,16 @@ class _MyAppState extends State<MyApp> {
                 style: const TextStyle(fontSize: 18),
               ),
               const SizedBox(height: 20),
+              Text(
+                'Screen is currently: ${_isScreenOn == null ? "..." : (_isScreenOn! ? "ON" : "OFF")}',
+                style: const TextStyle(fontSize: 18),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Last screen event: $_lastScreenEvent',
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _isAdminEnabled ? null : _requestAdmin,
                 child: const Text('Enable Device Admin'),
@@ -69,6 +107,11 @@ class _MyAppState extends State<MyApp> {
               ElevatedButton(
                 onPressed: _isAdminEnabled ? _lockScreen : null,
                 child: const Text('Lock Screen'),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _checkScreenState,
+                child: const Text('Check Screen State'),
               ),
               const SizedBox(height: 20),
               ElevatedButton(
