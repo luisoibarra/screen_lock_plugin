@@ -2,12 +2,14 @@ package com.example.screen_lock_plugin
 
 import android.app.Activity
 import android.app.admin.DevicePolicyManager
-import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
+import android.util.Log
 import androidx.annotation.NonNull
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -19,9 +21,9 @@ import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.PluginRegistry
 import io.flutter.plugin.common.EventChannel
 
-class ScreenLockPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, 
+class ScreenLockPlugin: FlutterPlugin, MethodCallHandler, ActivityAware,
     PluginRegistry.ActivityResultListener, EventChannel.StreamHandler {
-    
+
     private lateinit var channel: MethodChannel
     private lateinit var eventChannel: EventChannel
     private var context: Context? = null
@@ -30,13 +32,12 @@ class ScreenLockPlugin: FlutterPlugin, MethodCallHandler, ActivityAware,
     private var componentName: ComponentName? = null
     private var pendingResult: Result? = null
     private var eventsSink: EventChannel.EventSink? = null
-    private var screenBroadcastReceiver: BroadcastReceiver? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     companion object {
+        private const val TAG = "ScreenLockPlugin"
         private const val DEVICE_ADMIN_REQUEST = 1001
         private const val EVENT_CHANNEL_NAME = "screen_lock_plugin/events"
-        private const val EVENT_SCREEN_ON = "SCREEN_ON"
-        private const val EVENT_SCREEN_OFF = "SCREEN_OFF"
     }
 
     override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -167,30 +168,52 @@ class ScreenLockPlugin: FlutterPlugin, MethodCallHandler, ActivityAware,
     }
 
     private fun startListeningForScreenEvents() {
-        if (screenBroadcastReceiver != null) return
         val appContext = context ?: return
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_SCREEN_ON)
-            addAction(Intent.ACTION_SCREEN_OFF)
-        }
 
-        screenBroadcastReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                when (intent?.action) {
-                    Intent.ACTION_SCREEN_ON -> eventsSink?.success(EVENT_SCREEN_ON)
-                    Intent.ACTION_SCREEN_OFF -> eventsSink?.success(EVENT_SCREEN_OFF)
-                }
+        // Bridge events emitted by ScreenEventService into the active Dart
+        // EventChannel. The broadcast receiver inside the service fires on the
+        // main thread, but guard with a handler post to be safe in case a future
+        // change moves it off-thread.
+        ScreenEventService.listener = { event ->
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                eventsSink?.success(event)
+            } else {
+                mainHandler.post { eventsSink?.success(event) }
             }
         }
-        appContext.registerReceiver(screenBroadcastReceiver, filter)
+
+        val serviceIntent = Intent(appContext, ScreenEventService::class.java)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                appContext.startForegroundService(serviceIntent)
+            } else {
+                appContext.startService(serviceIntent)
+            }
+            Log.d(TAG, "Requested start of ScreenEventService")
+        } catch (e: Exception) {
+            // Most common cause: foreground-service-start restrictions. Log and
+            // surface a best-effort error on the event stream so the Dart side
+            // can react instead of silently missing events.
+            Log.e(TAG, "Failed to start ScreenEventService", e)
+            eventsSink?.error(
+                "FGS_START_FAILED",
+                "Failed to start screen-event foreground service: ${e.message}",
+                null
+            )
+        }
     }
 
     private fun stopListeningForScreenEvents() {
         val appContext = context
-        if (appContext != null && screenBroadcastReceiver != null) {
-            appContext.unregisterReceiver(screenBroadcastReceiver)
+        ScreenEventService.listener = null
+        if (appContext != null) {
+            try {
+                appContext.stopService(Intent(appContext, ScreenEventService::class.java))
+                Log.d(TAG, "Requested stop of ScreenEventService")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to stop ScreenEventService", e)
+            }
         }
-        screenBroadcastReceiver = null
         eventsSink = null
     }
 }
