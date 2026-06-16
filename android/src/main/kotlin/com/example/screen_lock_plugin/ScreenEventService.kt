@@ -56,7 +56,12 @@ class ScreenEventService : Service() {
         super.onCreate()
         Log.d(TAG, "ScreenEventService.onCreate")
         ensureNotificationChannel()
-        startInForeground()
+        if (!startInForeground()) {
+            // startForeground() throws on Android 14+ when FGS type/permission rules
+            // are not met; an uncaught exception here crashes the host app.
+            stopSelf()
+            return
+        }
         registerScreenReceiver()
         registerDisplayListener()
         // Seed the state so later transitions emit, and start the fallback poll.
@@ -131,24 +136,28 @@ class ScreenEventService : Service() {
         }
     }
 
-    private fun startInForeground() {
+    // Returns false when startForeground fails so onCreate can stop cleanly
+    // instead of taking down the host process.
+    private fun startInForeground(): Boolean {
         val notification = buildNotification()
-        when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> {
-                val type = resolveForegroundServiceType()
-                Log.d(TAG, "startForeground type=$type (API ${Build.VERSION.SDK_INT})")
-                startForeground(NOTIF_ID, notification, type)
+        return try {
+            when {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> {
+                    val type = resolveForegroundServiceType()
+                    Log.d(TAG, "startForeground type=$type (API ${Build.VERSION.SDK_INT})")
+                    startForeground(NOTIF_ID, notification, type)
+                }
+                else -> {
+                    // Pre-API-34: runtime FGS type constants do not include
+                    // specialUse; omit the type and let the manifest declaration
+                    // govern behavior on newer targetSdk values.
+                    startForeground(NOTIF_ID, notification)
+                }
             }
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> {
-                startForeground(
-                    NOTIF_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-                )
-            }
-            else -> {
-                startForeground(NOTIF_ID, notification)
-            }
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground failed", e)
+            false
         }
     }
 

@@ -1,3 +1,9 @@
+## 0.0.4
+
+* `ScreenEventService` no longer crashes the host app when `startForeground()` fails on Android 14+ (e.g. missing FGS permissions or Play Console special-use declaration); the service stops itself and logs the error instead
+* Fixed foreground service type mismatch on API 29–33: removed `DATA_SYNC` runtime type that did not match the manifest’s `specialUse|systemExempted` declaration; pre-API-34 devices now rely on the manifest declaration
+* `lockScreen()` catches `SecurityException` from `DevicePolicyManager.lockNow()` and surfaces a `LOCK_FAILED` platform error instead of crashing when device admin is revoked mid-call
+
 ## 0.0.3
 
 * Screen on/off events are now delivered by a dedicated foreground service (`ScreenEventService`) so they keep firing when the host app is backgrounded or running under background / FGS restrictions

@@ -75,8 +75,13 @@ class ScreenLockPlugin: FlutterPlugin, MethodCallHandler, ActivityAware,
         }
 
         if (devicePolicyManager!!.isAdminActive(componentName!!)) {
-            devicePolicyManager!!.lockNow()
-            result.success(true)
+            try {
+                devicePolicyManager!!.lockNow()
+                result.success(true)
+            } catch (e: SecurityException) {
+                Log.e(TAG, "lockNow failed", e)
+                result.error("LOCK_FAILED", e.message, null)
+            }
         } else {
             result.success(false)
         }
